@@ -2,6 +2,7 @@ use num_bigint::BigUint;
 use thiserror::Error;
 use num_traits::Zero;
 
+#[derive(Debug)]
 pub struct FiniteField {
     pub p: BigUint,
 }
@@ -64,71 +65,62 @@ impl FiniteField {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_bigint::{BigUint};
-
-    fn bu(n: u64) -> BigUint {
-        BigUint::from(n)
-    }
 
     fn setup_field() -> FiniteField {
-        FiniteField { p: bu(17) }
+        FiniteField { p: 17u32.into() }
     }
 
     #[test]
     fn test_addition() {
         let field = setup_field();
-        assert_eq!(field.add(&bu(10), &bu(10)), bu(3));
-        assert_eq!(field.add(&bu(0), &bu(5)), bu(5));
-        assert_eq!(field.add(&bu(12), &bu(5)), bu(0));
+        assert_eq!(field.add(&10u32.into(), &10u32.into()), 3u32.into());
+        assert_eq!(field.add(&0u32.into(), &5u32.into()), 5u32.into());
+        assert_eq!(field.add(&12u32.into(), &5u32.into()), 0u32.into());
     }
 
     #[test]
     fn test_subtraction() {
         let field = setup_field();
         // Standard: 10 - 5 = 5
-        assert_eq!(field.sub(&bu(10), &bu(5)), bu(5));
+        assert_eq!(field.sub(&10u32.into(), &5u32.into()), 5u32.into());
         // Underflow: 5 - 10 = -5. -5 mod 17 = 12
-        assert_eq!(field.sub(&bu(5), &bu(10)), bu(12));
+        assert_eq!(field.sub(&5u32.into(), &10u32.into()), 12u32.into());
         // Large input: 20 - 5. (20 is 3 mod 17). 3 - 5 = -2. -2 mod 17 = 15
-        assert_eq!(field.sub(&bu(20), &bu(5)), bu(15));
+        assert_eq!(field.sub(&20u32.into(), &5u32.into()), 15u32.into());
     }
 
     #[test]
     fn test_additive_inverse() {
         let field = setup_field();
-        // Inv(5) = 12
-        assert_eq!(field.add_inv(&bu(5)), bu(12));
-        // Inv(0) = 0
-        assert_eq!(field.add_inv(&bu(0)), bu(0));
-        // Inv(18) -> Inv(1) = 16
-        assert_eq!(field.add_inv(&bu(18)), bu(16));
+        assert_eq!(field.add_inv(&5u32.into()), 12u32.into());
+        assert_eq!(field.add_inv(&0u32.into()), 0u32.into());
+        assert_eq!(field.add_inv(&18u32.into()), 16u32.into());
     }
 
     #[test]
     fn test_multiplication() {
         let field = setup_field();
-        assert_eq!(field.mul(&bu(3), &bu(10)), bu(13));
-        assert_eq!(field.mul(&bu(0), &bu(5)), bu(0));
-        assert_eq!(field.mul(&bu(11), &bu(14)), bu(1));
+        assert_eq!(field.mul(&3u32.into(), &10u32.into()), 13u32.into());
+        assert_eq!(field.mul(&0u32.into(), &5u32.into()), 0u32.into());
+        assert_eq!(field.mul(&11u32.into(), &14u32.into()), 1u32.into());
     }
 
     #[test]
     fn test_multiplicative_inverse() {
         let field = setup_field();
-        // 3 * x = 1 mod 17 -> x = 6 (3*6=18, 18 mod 17 = 1)
-        assert_eq!(field.mul_inv(&bu(3)).unwrap(), bu(6));
+        assert_eq!(field.mul_inv(&3u32.into()).unwrap(), 6u32.into());
 
         // Test Error: Zero
         assert_eq!(
-            field.mul_inv(&bu(0)).unwrap_err(),
+            field.mul_inv(&0u32.into()).unwrap_err(),
             FiniteFieldError::ZeroHasNoInverse
         );
 
         // Test Error: No Inverse (using composite modulus)
-        let composite_field = FiniteField { p: bu(10) };
+        let composite_field = FiniteField { p: 10u32.into() };
         // gcd(2, 10) = 2, so 2 has no inverse mod 10
         assert_eq!(
-            composite_field.mul_inv(&bu(2)).unwrap_err(),
+            composite_field.mul_inv(&2u32.into()).unwrap_err(),
             FiniteFieldError::NoInverse
         );
     }
@@ -136,15 +128,12 @@ mod tests {
     #[test]
     fn test_division() {
         let field = setup_field();
-        // 10 / 2 = 5
-        assert_eq!(field.div(&bu(10), &bu(2)).unwrap(), bu(5));
-
-        // 1 / 3 mod 17 -> 1 * 6 = 6
-        assert_eq!(field.div(&bu(1), &bu(3)).unwrap(), bu(6));
+        assert_eq!(field.div(&10u32.into(), &2u32.into()).unwrap(), 5u32.into());
+        assert_eq!(field.div(&1u32.into(), &3u32.into()).unwrap(), 6u32.into());
 
         // Test Error: Divide by zero
         assert_eq!(
-            field.div(&bu(10), &bu(0)).unwrap_err(),
+            field.div(&10u32.into(), &0u32.into()).unwrap_err(),
             FiniteFieldError::DivisionByZero
         );
     }
@@ -152,11 +141,8 @@ mod tests {
     #[test]
     fn test_power() {
         let field = setup_field();
-        // 2^4 = 16 mod 17 = 16
-        assert_eq!(field.pow(&bu(4), &bu(2)), bu(16));
-        // 3^0 = 1
-        assert_eq!(field.pow(&bu(0), &bu(3)), bu(1));
-        // 0^5 = 0
-        assert_eq!(field.pow(&bu(5), &bu(0)), bu(0));
+        assert_eq!(field.pow(&4u32.into(), &2u32.into()), 16u32.into());
+        assert_eq!(field.pow(&0u32.into(), &3u32.into()), 1u32.into());
+        assert_eq!(field.pow(&5u32.into(), &0u32.into()), 0u32.into());
     }
 }

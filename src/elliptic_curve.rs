@@ -16,9 +16,10 @@ pub enum Point {
 }
 
 // E: y^2 = x^3 + ax + b mod p
+#[derive(Debug)]
 pub struct EllipticCurve {
-    pub a: BigUint,
-    pub b: BigUint,
+    a: BigUint,
+    b: BigUint,
     f: FiniteField,
 }
 
@@ -28,8 +29,6 @@ pub enum EllipticCurveError {
     InvalidCurve,
     #[error("Cannot multiply by zero scalar")]
     ZeroScalar,
-    #[error("Point ({x}, {y}) is not on the curve")]
-    PointNotOnCurve { x: BigUint, y: BigUint },
     #[error("Operation {op} failed: {reason}")]
     OperationFailed { op: String, reason: String },
     #[error(transparent)]
@@ -79,8 +78,17 @@ impl EllipticCurve {
 
     // TODO: Improve with bitwise operations
     pub fn scalar_mul(&self, n: &BigUint, point: &Point) -> Result<Point, EllipticCurveError> {
+        // 0 * P = Identity
         if n.is_zero() {
-            return Err(EllipticCurveError::ZeroScalar);
+            return Ok(Point::Identity);
+        }
+        if n.is_zero() {
+            return Ok(Point::Identity);
+        }
+
+        // Identity * n = Identity
+        if *point == Point::Identity {
+            return Ok(Point::Identity);
         }
 
         let mut result = point.clone();
@@ -100,6 +108,10 @@ impl EllipticCurve {
             Point::Identity => true,
         }
     }
+
+    pub fn a(&self) -> &BigUint { &self.a }
+    pub fn b(&self) -> &BigUint { &self.b }
+    pub fn p(&self) -> &BigUint { &self.f.p }
 
     fn calculate_slope(
         &self,
@@ -134,30 +146,84 @@ impl EllipticCurve {
 mod tests {
     use super::*;
 
+    fn setup_curve() -> EllipticCurve {
+        // y^2 = x^3 + 2x + 2 (mod 17)
+        EllipticCurve::new(
+            2u32.into(),
+            2u32.into(),
+            17u32.into(),
+        ).unwrap()
+    }
+
     #[test]
-    fn test_ecc_add() {
-        let curve = EllipticCurve {
-            a: BigUint::from(2u32),
-            b: BigUint::from(2u32),
-            f: FiniteField {
-                p: BigUint::from(17u32),
-            },
-        };
-        let p1 = Point::Coordinate {
-            x: BigUint::from(5u32),
-            y: BigUint::from(1u32),
-        };
-        let p2 = Point::Coordinate {
-            x: BigUint::from(3u32),
-            y: BigUint::from(1u32),
-        };
+    fn test_point_on_curve() {
+        let curve = setup_curve();
+        let p = Point::Coordinate { x: 5u32.into(), y: 1u32.into() };
+        assert!(curve.is_on_curve(&p));
+
+        let p_bad = Point::Coordinate { x: 5u32.into(), y: 2u32.into() };
+        assert!(!curve.is_on_curve(&p_bad));
+    }
+
+    #[test]
+    fn test_identity_rules() {
+        let curve = setup_curve();
+        let p = Point::Coordinate { x: 5u32.into(), y: 1u32.into() };
+
+        assert_eq!(curve.add(&p, &Point::Identity).unwrap(), p);
+        assert_eq!(curve.add(&Point::Identity, &p).unwrap(), p);
+    }
+
+    #[test]
+    fn test_point_addition() {
+        let curve = setup_curve();
+        let p1 = Point::Coordinate { x: 5u32.into(), y: 1u32.into() };
+        let p2 = Point::Coordinate { x: 6u32.into(), y: 3u32.into() };
+
         let res = curve.add(&p1, &p2).unwrap();
-        assert_eq!(
-            res,
-            Point::Coordinate {
-                x: BigUint::from(9u32),
-                y: BigUint::from(16u32)
-            }
-        );
+        assert_eq!(res, Point::Coordinate { x: 10u32.into(), y: 6u32.into() });
+    }
+
+    #[test]
+    fn test_point_doubling() {
+        let curve = setup_curve();
+        let p = Point::Coordinate { x: 5u32.into(), y: 1u32.into() };
+        let res = curve.add(&p, &p).unwrap();
+
+        assert!(curve.is_on_curve(&res));
+        assert_eq!(res, Point::Coordinate { x: 6u32.into(), y: 3u32.into() });
+    }
+
+    #[test]
+    fn test_inverse_addition() {
+        let curve = setup_curve();
+        let p1 = Point::Coordinate { x: 5u32.into(), y: 1u32.into() };
+        let p2 = Point::Coordinate { x: 5u32.into(), y: 16u32.into() };
+
+        assert_eq!(curve.add(&p1, &p2).unwrap(), Point::Identity);
+    }
+
+    #[test]
+    fn test_scalar_multiplication() {
+        let curve = setup_curve();
+        let p = Point::Coordinate { x: 5u32.into(), y: 1u32.into() };
+
+        let res2 = curve.scalar_mul(&2u32.into(), &p).unwrap();
+        let manual2 = curve.add(&p, &p).unwrap();
+        assert_eq!(res2, manual2);
+
+        let res0 = curve.scalar_mul(&0u32.into(), &p).unwrap();
+        assert_eq!(res0, Point::Identity);
+
+        let res_identity = curve.scalar_mul(&5u32.into(), &Point::Identity).unwrap();
+        assert_eq!(res_identity, Point::Identity);
+    }
+
+    #[test]
+    fn test_invalid_curve_determinant() {
+        // Curve where 4a^3 + 27b^2 = 0
+        let res = EllipticCurve::new(0u32.into(), 0u32.into(),17u32.into());
+        assert!(res.is_err());
+        assert_eq!(res.unwrap_err(), EllipticCurveError::InvalidCurve);
     }
 }
