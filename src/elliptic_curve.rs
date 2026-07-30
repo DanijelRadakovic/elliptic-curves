@@ -1,7 +1,6 @@
 use crate::finite_field::{FiniteField, FiniteFieldError};
 use num_bigint::BigUint;
-use num_iter::range;
-use num_traits::{One, Zero};
+use num_traits::Zero;
 use thiserror::Error;
 
 const TWO: BigUint = BigUint::new_const(2);
@@ -102,8 +101,12 @@ impl EllipticCurve {
         }
 
         let mut result = point.clone();
-        for _ in range(BigUint::one(), n.clone()) {
-            result = self.add(&result, point)?
+        for i in (0..n.bits() - 1).rev() {
+            result = self.add(&result, &result)?;
+
+            if n.bit(i) {
+                result = self.add(point, &result)?;
+            }
         }
         Ok(result)
     }
@@ -292,15 +295,24 @@ mod tests {
             y: 1u32.into(),
         };
 
-        let res2 = curve.scalar_mul(&2u32.into(), &p).unwrap();
-        let manual2 = curve.add(&p, &p).unwrap();
-        assert_eq!(res2, manual2);
+        let res = curve.scalar_mul(&2u32.into(), &p).unwrap();
+        let manual = curve.add(&p, &p).unwrap();
+        assert_eq!(res, manual);
 
-        let res0 = curve.scalar_mul(&0u32.into(), &p).unwrap();
-        assert_eq!(res0, Point::Identity);
+        let res = curve.scalar_mul(&0u32.into(), &p).unwrap();
+        assert_eq!(res, Point::Identity);
 
-        let res_identity = curve.scalar_mul(&5u32.into(), &Point::Identity).unwrap();
-        assert_eq!(res_identity, Point::Identity);
+        let res = curve.scalar_mul(&5u32.into(), &Point::Identity).unwrap();
+        assert_eq!(res, Point::Identity);
+
+        let res = curve.scalar_mul(&236u32.into(), &p).unwrap();
+        assert_eq!(
+            res,
+            Point::Coordinate {
+                x: 13u32.into(),
+                y: 7u32.into()
+            }
+        );
     }
 
     #[test]
