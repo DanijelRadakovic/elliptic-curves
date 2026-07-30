@@ -85,12 +85,8 @@ impl EllipticCurve {
         }
     }
 
-    // TODO: Improve with bitwise operations
     pub fn scalar_mul(&self, n: &BigUint, point: &Point) -> Result<Point, EllipticCurveError> {
         // 0 * P = Identity
-        if n.is_zero() {
-            return Ok(Point::Identity);
-        }
         if n.is_zero() {
             return Ok(Point::Identity);
         }
@@ -100,6 +96,7 @@ impl EllipticCurve {
             return Ok(Point::Identity);
         }
 
+        self.validate_point(point)?;
         let mut result = point.clone();
         for i in (0..n.bits() - 1).rev() {
             result = self.add(&result, &result)?;
@@ -313,6 +310,10 @@ mod tests {
                 y: 7u32.into()
             }
         );
+        
+        let res = curve.scalar_mul(&5u32.into(), &Point::Coordinate {x: 3u32.into(), y: 3u32.into()});
+        assert!(res.is_err());
+        assert_eq!(res.unwrap_err(), EllipticCurveError::PointNotOnCurve {x: 3u32.into(), y: 3u32.into(), a: 2u32.into(), b: 2u32.into(), p: 17u32.into()});
     }
 
     #[test]
