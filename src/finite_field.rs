@@ -2,7 +2,7 @@ use num_bigint::BigUint;
 use thiserror::Error;
 use num_traits::Zero;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct FiniteField {
     pub p: BigUint,
 }
