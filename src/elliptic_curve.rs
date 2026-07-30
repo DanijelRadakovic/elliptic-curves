@@ -222,12 +222,30 @@ mod tests {
             y: 3u32.into(),
         };
 
+        let p3 = Point::Coordinate {
+            x: 5u32.into(),
+            y: 5u32.into(),
+        };
+
         let res = curve.add(&p1, &p2).unwrap();
         assert_eq!(
             res,
             Point::Coordinate {
                 x: 10u32.into(),
                 y: 6u32.into()
+            }
+        );
+
+        let res = curve.add(&p1, &p3);
+        assert!(res.is_err());
+        assert_eq!(
+            res.unwrap_err(),
+            EllipticCurveError::PointNotOnCurve {
+                x: 5u32.into(),
+                y: 5u32.into(),
+                a: 2u32.into(),
+                b: 2u32.into(),
+                p: 17u32.into()
             }
         );
     }
