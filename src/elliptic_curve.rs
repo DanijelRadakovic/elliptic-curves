@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use crate::finite_field::{FiniteField, FiniteFieldError};
 use num_bigint::BigUint;
 use num_traits::Zero;
@@ -70,6 +71,11 @@ impl EllipticCurve {
                     return Ok(Point::Identity);
                 }
 
+                // P = (x, 0), 2 * P = Identity
+                if point1 == point2 && y1.cmp(&BigUint::zero()) == Ordering::Equal {
+                    return Ok(Point::Identity);
+                }
+
                 let s = self.calculate_slope(point1, point2).map_err(|e| {
                     EllipticCurveError::OperationFailed {
                         op: format!("{:?} + {:?}", point1, point2),
@@ -86,6 +92,8 @@ impl EllipticCurve {
     }
 
     pub fn scalar_mul(&self, n: &BigUint, point: &Point) -> Result<Point, EllipticCurveError> {
+        self.validate_point(point)?;
+
         // 0 * P = Identity
         if n.is_zero() {
             return Ok(Point::Identity);
@@ -96,7 +104,6 @@ impl EllipticCurve {
             return Ok(Point::Identity);
         }
 
-        self.validate_point(point)?;
         let mut result = point.clone();
         for i in (0..n.bits() - 1).rev() {
             result = self.add(&result, &result)?;
@@ -182,6 +189,12 @@ mod tests {
         EllipticCurve::new(2u32.into(), 2u32.into(), 17u32.into()).unwrap()
     }
 
+    fn setup_curve_with_zero() -> EllipticCurve {
+        // y^2 = x^3 + 2 (mod 17)
+        // has y=0 in (10,0)
+        EllipticCurve::new(2u32.into(), 0u32.into(), 17u32.into()).unwrap()
+    }
+
     #[test]
     fn test_point_on_curve() {
         let curve = setup_curve();
@@ -213,6 +226,7 @@ mod tests {
     #[test]
     fn test_point_addition() {
         let curve = setup_curve();
+        let curve_zero = setup_curve_with_zero();
         let p1 = Point::Coordinate {
             x: 5u32.into(),
             y: 1u32.into(),
@@ -227,6 +241,11 @@ mod tests {
             y: 5u32.into(),
         };
 
+        let p1_zero = Point::Coordinate {
+            x: 10u32.into(),
+            y: 0u32.into(),
+        };
+
         let res = curve.add(&p1, &p2).unwrap();
         assert_eq!(
             res,
@@ -235,6 +254,9 @@ mod tests {
                 y: 6u32.into()
             }
         );
+
+        let res = curve_zero.add(&p1_zero, &p1_zero).unwrap();
+        assert_eq!(res, Point::Identity);
 
         let res = curve.add(&p1, &p3);
         assert!(res.is_err());
@@ -287,9 +309,14 @@ mod tests {
     #[test]
     fn test_scalar_multiplication() {
         let curve = setup_curve();
+        let curve_zero = setup_curve_with_zero();
         let p = Point::Coordinate {
             x: 5u32.into(),
             y: 1u32.into(),
+        };
+        let p_zero = Point::Coordinate {
+            x: 10u32.into(),
+            y: 0u32.into(),
         };
 
         let res = curve.scalar_mul(&2u32.into(), &p).unwrap();
@@ -310,10 +337,16 @@ mod tests {
                 y: 7u32.into()
             }
         );
-        
+
         let res = curve.scalar_mul(&5u32.into(), &Point::Coordinate {x: 3u32.into(), y: 3u32.into()});
         assert!(res.is_err());
         assert_eq!(res.unwrap_err(), EllipticCurveError::PointNotOnCurve {x: 3u32.into(), y: 3u32.into(), a: 2u32.into(), b: 2u32.into(), p: 17u32.into()});
+
+        let res = curve_zero.scalar_mul(&2u32.into(), &p_zero).unwrap();
+        assert_eq!(res, Point::Identity);
+
+        let res = curve_zero.scalar_mul(&3u32.into(), &p_zero).unwrap();
+        assert_eq!(res, p_zero);
     }
 
     #[test]
