@@ -4,7 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-num-bigint = "0.5.1"
+num-bigint = { version = "0.5.1", features = ["rand_0_10"] }
 num-iter = "0.1.46"
 num-traits = "0.2.19"
 thiserror = "2.0.19"
+rand = "0.10.2"
+sha256 = "1.6.0"
+hex = "0.4.3"

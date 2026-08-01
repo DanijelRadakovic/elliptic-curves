@@ -1,5 +1,6 @@
 use num_bigint::BigUint;
-use num_traits::{Zero,Num};
+use num_traits::{Num};
+use elliptic_curves::ecdsa::ECDSA;
 use elliptic_curves::elliptic_curve::{EllipticCurve, EllipticCurveError, Point};
 use elliptic_curves::elliptic_curve::Point::{Coordinate, Identity};
 
@@ -43,4 +44,17 @@ fn test_multiplication() {
     let point = ec.scalar_mul(&5u32.into(), &Coordinate {x: 1u32.into(), y: 1u32.into()});
     assert!(point.is_err());
     assert_eq!(point.unwrap_err(), EllipticCurveError::PointNotOnCurve {x: 1u32.into() ,y: 1u32.into(), a: ec.a().clone(), b: ec.b().clone(), p: ec.p().clone()});
+}
+
+#[test]
+fn test_signature() {
+    let ec = setup_secp256k1();
+    let ecdsa = ECDSA::new(ec, g(), n()).unwrap();
+
+    let (private_key, public_key) = ecdsa.generate_key_pair().unwrap();
+    let msg = b"For the Emperor!";
+    let digest = BigUint::from_str_radix(&sha256::digest(msg), 16).unwrap();
+    let signature = ecdsa.sign(&digest, &private_key).unwrap();
+    let result = ecdsa.verify(&digest, &signature, &public_key).unwrap();
+    assert_eq!(result, true);
 }

@@ -135,6 +135,8 @@ impl EllipticCurve {
     pub fn p(&self) -> &BigUint {
         &self.f.p
     }
+    
+    pub fn f(&self) -> &FiniteField {&self.f}
 
     fn calculate_slope(
         &self,
